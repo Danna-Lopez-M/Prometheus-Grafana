@@ -24,3 +24,5 @@ Thumbs.db
 *.log
 node_modules
 node_modules.tar.gz
+
+dist/

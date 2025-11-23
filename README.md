@@ -2,6 +2,13 @@
 
 **Danna Valentina López Muñoz - A00395625**
 
+Para ver el ejercicio de Prometheus y Grafana, ve directamente a la [Sección 8: Integración de Prometheus y Grafana](#8-integración-de-prometheus-y-grafana)
+
+---
+
+<details>
+<summary><strong>Secciones anteriores: SonarQube y Trivy (click para expandir)</strong></summary>
+
 Este documento describe el proceso de despliegue de SonarQube y Trivy en una máquina virtual de Azure usando Docker.
 
 ##  Resumen del Proceso
@@ -224,10 +231,13 @@ Primero, configurar los secrets necesarios en GitHub:
 ![Generación de Infraestructura](imagenes/pipeline-infra.png)
 ![Generación de Integración Continua](imagenes/pipeline-ci.png)
 
+</details>
+
+---
 
 ## 8. Integración de Prometheus y Grafana
 
-Se ha integrado Prometheus y Grafana al proyecto para monitorear las métricas de la aplicación NestJS.
+Se ha integrado Prometheus y Grafana al proyecto para monitorear las métricas de la aplicación.
 
 ### Configuración
 
@@ -247,28 +257,7 @@ Antes de iniciar la aplicación, necesitas tener PostgreSQL corriendo. El proyec
    docker-compose up -d postgres
    ```
 
-2. **Verifica que el archivo `.env` existe** con la configuración correcta:
-   ```bash
-   cat .env
-   ```
-   
-   Si no existe, cópialo desde el ejemplo:
-   ```bash
-   cp .env.example .env
-   ```
-
-   El archivo `.env` debe contener:
-   ```env
-   DB_HOST=localhost
-   DB_PORT=5432
-   DB_USERNAME=postgres
-   DB_PASSWORD=postgres
-   DB_NAME=rentastech
-   PORT=5000
-   NODE_ENV=development
-   ```
-
-3. **Verifica que PostgreSQL esté corriendo**:
+2. **Verifica que PostgreSQL esté corriendo**:
    ```bash
    docker-compose ps postgres
    ```
@@ -281,14 +270,14 @@ Una vez que PostgreSQL esté corriendo, inicia tu aplicación NestJS:
 npm run start:dev
 ```
 
-La aplicación estará disponible en `http://localhost:5000` y debería conectarse correctamente a la base de datos.
+La aplicación estará disponible en `http://<IP_VM>:9100` (o el puerto configurado en tu `.env`) y debería conectarse correctamente a la base de datos.
 
 #### Paso 2: Verificar el endpoint de métricas
 
 Verifica que el endpoint de métricas esté funcionando:
 
 ```bash
-curl http://localhost:5000/metrics
+curl http://<IP_VM>:9100/metrics
 ```
 
 Deberías ver métricas en formato Prometheus como:
@@ -302,6 +291,8 @@ process_cpu_user_seconds_total 0.123
 process_cpu_system_seconds_total 0.045
 ...
 ```
+![Metricas prometheus](imagenes/metrics.png)
+
 
 #### Paso 3: Iniciar Prometheus y Grafana con Docker Compose
 
@@ -319,48 +310,60 @@ docker-compose up -d
 
 #### Paso 4: Verificar que Prometheus esté recolectando métricas
 
-1. Accede a la interfaz de Prometheus en: `http://localhost:9090`
+1. Accede a la interfaz de Prometheus en: `http://<IP_VM>:9090`
 2. Ve a **Status > Targets** para verificar que el target `nestjs-app` esté en estado "UP"
-3. Si el target está "DOWN", verifica:
-   - Que la aplicación NestJS esté corriendo en el puerto 5000
-   - En Linux, puede ser necesario actualizar `prometheus/prometheus.yml` para usar la IP del host en lugar de `host.docker.internal`
+
+![Estado recolección de métricas](imagenes/prometheus-status.png)
+
+3. Si el target está "DOWN", verifica que la aplicación NestJS esté corriendo en el puerto 9100
 
 #### Paso 5: Consultar métricas en Prometheus
 
-En la interfaz de Prometheus (`http://localhost:9090`):
+En la interfaz de Prometheus (`http://<IP_VM>:9090`):
 
 1. Ve a la pestaña **Graph**
 2. Prueba algunas consultas como:
-   - `process_cpu_user_seconds_total` - Tiempo de CPU del proceso
-   - `process_resident_memory_bytes` - Memoria residente
-   - `nodejs_heap_size_total_bytes` - Tamaño total del heap de Node.js
-   - `http_requests_total` - Total de peticiones HTTP (si está configurado)
+   - `process_cpu_user_seconds_total`
+   - `process_resident_memory_bytes`
+
+![Metricas memoria](imagenes/memoria-residente.png)
+![Metricas cpu](imagenes/cpu-tiempo.png)
+
 
 #### Paso 6: Acceder a Grafana
 
-1. Accede a Grafana en: `http://localhost:3000`
+1. Accede a Grafana en: `http://<IP_VM>:3000`
 2. Inicia sesión con:
    - **Usuario**: `admin`
    - **Contraseña**: `admin`
-3. Grafana te pedirá cambiar la contraseña (opcional, puedes hacer clic en "Skip")
+3. Grafana te pedirá cambiar la contraseña (opcional)
 
 #### Paso 7: Verificar el datasource de Prometheus
 
-1. En Grafana, ve a **Configuration > Data Sources**
+1. En Grafana, ve a **Connections** en el menú lateral izquierdo
 2. Deberías ver que **Prometheus** ya está configurado como datasource por defecto
 3. Haz clic en **Prometheus** y luego en **Save & Test** para verificar la conexión
-4. Deberías ver un mensaje verde: "Data source is working"
+4. Deberías ver un mensaje verde
+
+![Conexión prometheus-grafana](imagenes/save&test.png)
 
 #### Paso 8: Crear un dashboard básico
 
 1. Ve a **Dashboards > New Dashboard**
 2. Haz clic en **Add visualization**
 3. Selecciona el datasource **Prometheus**
+
+![Selección datasource](imagenes/datasource-prometheus.png)
+
+
 4. En la consulta, prueba con:
    ```
    process_cpu_user_seconds_total
    ```
 5. Haz clic en **Run query** para ver los datos
+
+![Ejecutar consulta](imagenes/query.png)
+
 6. Guarda el dashboard
 
 #### Paso 9: Generar tráfico para ver métricas
@@ -369,47 +372,13 @@ Para ver métricas más interesantes, genera tráfico en tu aplicación:
 
 ```bash
 # Hacer varias peticiones al endpoint principal
-for i in {1..10}; do curl http://localhost:5000; done
+for i in {1..10}; do curl http://localhost:9100; done
 
 # O acceder a otros endpoints de tu API
-curl http://localhost:5000/api
+curl http://localhost:9100/api
 ```
 
-Luego verifica las métricas en Prometheus o Grafana.
-
-### Solución de Problemas
-
-#### Prometheus no puede conectarse a la aplicación
-
-Si el target está "DOWN" en Prometheus:
-
-1. **En Linux**: Actualiza `prometheus/prometheus.yml` y cambia `host.docker.internal` por la IP de tu host:
-   ```yaml
-   static_configs:
-     - targets: ['192.168.1.100:5000']  # Reemplaza con tu IP
-   ```
-
-2. **Alternativa**: Usa `network_mode: host` en el servicio de Prometheus en `docker-compose.yml`:
-   ```yaml
-   prometheus:
-     network_mode: host
-     # ... resto de la configuración
-   ```
-
-#### Verificar que los contenedores estén corriendo
-
-```bash
-docker-compose ps
-```
-
-Deberías ver `prometheus` y `grafana` con estado "Up".
-
-#### Ver logs de los servicios
-
-```bash
-docker-compose logs prometheus
-docker-compose logs grafana
-```
+![Ejecutar consulta después de generar tráfico a la aplicación](imagenes/query-after-traffic.png)
 
 ### Métricas Disponibles
 
@@ -417,12 +386,8 @@ El módulo de Prometheus expone automáticamente las siguientes métricas:
 
 - **Métricas del proceso**: CPU, memoria, tiempo de ejecución
 - **Métricas de Node.js**: Heap size, event loop lag, garbage collection
-- **Métricas HTTP**: Total de peticiones, duración (si se configuran interceptores)
 
 ### Archivos de Configuración
 
 - `prometheus/prometheus.yml`: Configuración de Prometheus
 - `grafana/provisioning/datasources/datasource.yml`: Configuración automática del datasource de Prometheus en Grafana
-- `src/prometheus/prometheus.module.ts`: Módulo de Prometheus para NestJS
-
-
