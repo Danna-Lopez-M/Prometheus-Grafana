@@ -1,0 +1,80 @@
+name: Deploy Infrastructure (Azure VM with Terraform)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  terraform:
+    name: Deploy VM and SonarQube
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Terraform Init
+        run: terraform -chdir=vm-deploy/environments/dev init -input=false
+
+      - name: Terraform Validate
+        run: terraform -chdir=vm-deploy/environments/dev validate
+
+      - name: Terraform Plan
+        run: terraform -chdir=vm-deploy/environments/dev plan -input=false -var="admin_password=${{ secrets.ADMIN_PASSWORD }}"
+
+      - name: Terraform Apply
+        run: terraform -chdir=vm-deploy/environments/dev apply -auto-approve -input=false -var="admin_password=${{ secrets.ADMIN_PASSWORD }}"
+
+      - name: Get Terraform Outputs
+        id: tf_outputs
+        run: |
+          echo "📤 Obteniendo outputs de Terraform..."
+          public_ip=$(terraform -chdir=vm-deploy/environments/dev output -raw vm_public_ip 2>/dev/null || echo "")
+          echo "public_ip=$public_ip" >> $GITHUB_OUTPUT
+          echo "vm_admin_user=azureuser" >> $GITHUB_OUTPUT
+          echo "IP pública detectada: $public_ip"
+      
+      - name: Save environment variables
+        run: |          
+          echo "SONAR_HOST_URL=http://${{ steps.tf_outputs.outputs.public_ip }}:9000" >> $GITHUB_ENV
+          echo "VM_USER=${{ steps.tf_outputs.outputs.vm_admin_user }}" >> $GITHUB_ENV
+
+      - name: Wait for VM to be ready
+        run: |
+          echo "⏳ Esperando 40 segundos a que la VM inicialice el servicio SSH..."
+          sleep 40
+
+      - name: Verify Docker and SonarQube
+        env:
+          VM_USER: ${{ env.VM_USER }}
+          VM_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          VM_IP: ${{ steps.tf_outputs.outputs.public_ip }}
+        run: |
+          echo "⏳ Instalando expect..."
+          sudo apt-get update -y
+          sudo apt-get install -y expect
+    
+          echo "🔍 Verificando contenedores Docker en la VM..."
+          expect <<EOF
+          spawn ssh -o StrictHostKeyChecking=no $VM_USER@$VM_IP "docker ps"
+          expect "password:"
+          send "$VM_PASSWORD\r"
+          interact
+          EOF
+          echo "✅ Infraestructura desplegada correctamente"
