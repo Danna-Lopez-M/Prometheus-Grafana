@@ -28,6 +28,21 @@ services:
       - postgresql:/var/lib/postgresql
       - postgresql_data:/var/lib/postgresql/data
 
+  postgres:
+    image: postgres:13
+    container_name: postgres-app
+    ports:
+      - "5432:5432"
+    networks:
+      - sonarnet
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=rentastech
+    volumes:
+      - postgres_app_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
   trivy:
       image: aquasec/trivy:latest
       networks:
@@ -88,6 +103,7 @@ volumes:
   sonarqube_bundled-plugins:
   postgresql:
   postgresql_data:
+  postgres_app_data:
   trivy_cache:
   prometheus_data:
   grafana_data: 

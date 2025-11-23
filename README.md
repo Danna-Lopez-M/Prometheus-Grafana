@@ -238,15 +238,50 @@ El proyecto incluye:
 
 ### Cómo Probar Prometheus y Grafana
 
+#### Paso 0: Configurar la Base de Datos
+
+Antes de iniciar la aplicación, necesitas tener PostgreSQL corriendo. El proyecto incluye un servicio de PostgreSQL en `docker-compose.yml`.
+
+1. **Inicia el servicio de PostgreSQL**:
+   ```bash
+   docker-compose up -d postgres
+   ```
+
+2. **Verifica que el archivo `.env` existe** con la configuración correcta:
+   ```bash
+   cat .env
+   ```
+   
+   Si no existe, cópialo desde el ejemplo:
+   ```bash
+   cp .env.example .env
+   ```
+
+   El archivo `.env` debe contener:
+   ```env
+   DB_HOST=localhost
+   DB_PORT=5432
+   DB_USERNAME=postgres
+   DB_PASSWORD=postgres
+   DB_NAME=rentastech
+   PORT=5000
+   NODE_ENV=development
+   ```
+
+3. **Verifica que PostgreSQL esté corriendo**:
+   ```bash
+   docker-compose ps postgres
+   ```
+
 #### Paso 1: Iniciar la aplicación NestJS
 
-Primero, asegúrate de que tu aplicación NestJS esté corriendo en el puerto 5000:
+Una vez que PostgreSQL esté corriendo, inicia tu aplicación NestJS:
 
 ```bash
 npm run start:dev
 ```
 
-La aplicación estará disponible en `http://localhost:5000`
+La aplicación estará disponible en `http://localhost:5000` y debería conectarse correctamente a la base de datos.
 
 #### Paso 2: Verificar el endpoint de métricas
 
